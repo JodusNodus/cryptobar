@@ -1,0 +1,85 @@
+// vim: set filetype=javascript.jsx:
+"use strict"
+
+const https = require("https")
+
+const CRYPTOPANIC_API_TOKEN = process.env.CRYPTOPANIC_API_TOKEN
+const NEWS_CURRENCIES = process.env.NEWS_CURRENCIES.split(",")
+const PRICE_CURRENCIES = process.env.PRICE_CURRENCIES.split(",")
+
+function createQueryString(queries={}, apiToken){
+  if(apiToken){
+    Object.assign(queries, {
+      "auth_token": apiToken
+    })
+  }
+  return Object.keys(queries)
+    .map(key => `${key}=${queries[key]}`)
+    .join("&")
+}
+
+const fetchJson = (url) => new Promise(function(res, rej) {
+  https.get(url, function(resp) {
+    let data = ''
+    resp.on("data", (chunk) => {
+      data += chunk
+    })
+    resp.on("end", () => {
+      try {
+        res(JSON.parse(data))
+      } catch(e){
+        rej(e)
+      }
+    })
+  }).on("error", rej);
+})
+
+function fetchPosts (filter, currencies=[]) {
+  const queries ={ filter, currencies: currencies.join(",") }
+  const queryString = createQueryString(queries, CRYPTOPANIC_API_TOKEN)
+  const url = `https://cryptopanic.com/api/posts/?${queryString}`
+  return fetchJson(url)
+}
+
+function fetchCryptoPrice (currency) {
+  const url = `https://api.coinmarketcap.com/v1/ticker/${currency}/`
+  return fetchJson(url)
+    .then((json) => json[0])
+}
+
+const clean = (str) => str.replace(/\n|\r|\|/g, "").trim()
+const trun = (str, len) => str.slice(0, len) + (str.length > len ? "…" : "")
+const currenciesToStr = (currencies) => currencies
+  .map(curr => curr.code)
+  .join(", ")
+
+const parseNum = (str) => Math.floor(parseFloat(str) * 100) / 100
+
+async function getPrices(){
+  const prices = PRICE_CURRENCIES
+    .map(code => fetchCryptoPrice(code))
+  const result = await Promise.all(prices)
+  const str = result.map(c =>
+    `[${c.symbol}] [${parseNum(c.percent_change_24h)}%] $${parseNum(c.price_usd)}`)
+  return str.join("@@")
+}
+
+const getPosts = () => fetchPosts("hot", NEWS_CURRENCIES)
+  .then(function({ results }) {
+    const len = 80
+    return results
+      .filter(post => post.currencies.length > 0)
+      .map(post =>
+        `[${currenciesToStr(post.currencies)}] [${post.url}] ${trun(clean(post.title), len)}`)
+        .join("@@")
+  })
+
+const actions = [
+  getPosts(),
+  getPrices(),
+]
+
+Promise.all(actions)
+  .then((x) => process.stdout.write(x.join("||")))
+  .catch((err) => process.stdout.write("ERROR"))
+
