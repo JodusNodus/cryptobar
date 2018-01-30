@@ -7,7 +7,7 @@ Cryptobar is an [Übersicht](https://github.com/felixhageloh/uebersicht) widget 
 - [NodeJS](https://nodejs.org/en/) v8 or up
 
 ## Installation
-1. Clone or download and unzip it in your Übersicht widget folder (it is important that the subfolder is called "cryptobar").
+1. Clone (or download and unzip) it in your Übersicht widget folder (it is important that the cryptobar folder is called "cryptobar").
 2. Open `cryptopanic/index.coffee` with an editor and complete the configuration.
 
 ## Screenshot
